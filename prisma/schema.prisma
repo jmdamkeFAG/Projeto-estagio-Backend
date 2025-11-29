@@ -1,0 +1,157 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  // Removi o 'output' customizado para facilitar a importação padrão do Prisma
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------
+// ENUMS
+// --------------------------------------
+
+enum TipoUsuario {
+  ALUNO
+  PROFISSIONAL
+}
+
+enum StatusUsuario {
+  ATIVO
+  INATIVO
+}
+
+enum StatusAluno {
+  REGULAR
+  TRANCADO
+  FORMADO
+}
+
+enum Especialidade {
+  PSICOLOGIA
+  PEDAGOGIA
+  ASSISTENCIA_SOCIAL
+  OUTRO
+}
+
+enum TipoAtendimento {
+  PRESENCIAL
+  ONLINE
+}
+
+enum StatusAtendimento {
+  AGENDADO
+  CONCLUIDO
+  CANCELADO
+}
+
+enum CanalNotificacao {
+  WHATSAPP
+  EMAIL
+}
+
+enum StatusEnvio {
+  ENVIADO
+  FALHA
+  PENDENTE
+}
+
+// --------------------------------------
+// MODELS (Tabelas)
+// --------------------------------------
+
+model Usuario {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  senha_hash   String
+  nome         String
+  telefone_wpp String?
+  tipo         TipoUsuario
+  ativo        Boolean       @default(true) 
+
+  // Relacionamentos 1:1
+  aluno        Aluno?
+  profissional Profissional?
+
+  // Relacionamentos inversos
+  notificacoesRecebidas Notificacao[] @relation("UsuarioRecebeNotificacao")
+
+  @@map("usuarios")
+}
+
+model Aluno {
+  id_aluno  Int         @id @default(autoincrement())
+  matricula String      @unique
+  curso     String
+  periodo   Int
+  status    StatusAluno
+
+  // FK para Usuario
+  id_usuario Int     @unique
+  usuario    Usuario @relation(fields: [id_usuario], references: [id], onDelete: Cascade)
+
+  // Relacionamentos
+  atendimentos Atendimento[]
+
+  @@map("alunos")
+}
+
+model Profissional {
+  id_profissional Int           @id @default(autoincrement())
+  especialidade   Especialidade
+  registro        String 
+  disponibilidade String?       @db.Text 
+
+  // FK para Usuario
+  id_usuario Int     @unique
+  usuario    Usuario @relation(fields: [id_usuario], references: [id], onDelete: Cascade)
+
+  // Relacionamentos
+  atendimentos Atendimento[]
+
+  @@map("profissionais")
+}
+
+model Atendimento {
+  id                 Int               @id @default(autoincrement())
+  data_hora          DateTime
+  duracao_minutos    Int
+  tipo               TipoAtendimento
+  status             StatusAtendimento
+  resumo_aluno       String?           @db.Text
+  observacoes_sigilo String?           @db.Text
+
+  // FKs
+  id_aluno Int
+  aluno    Aluno @relation(fields: [id_aluno], references: [id_aluno])
+
+  id_profissional Int
+  profissional    Profissional @relation(fields: [id_profissional], references: [id_profissional])
+
+  // Relacionamento com Notificação
+  notificacao Notificacao?
+
+  @@map("atendimentos")
+}
+
+model Notificacao {
+  id                     Int              @id @default(autoincrement())
+  canal                  CanalNotificacao
+  tempo_antecedencia_min Int?
+  mensagem_template      String           @db.Text
+  data_envio             DateTime?
+  status_envio           StatusEnvio
+
+  // FK para Atendimento (1:1)
+  id_atendimento Int         @unique
+  atendimento    Atendimento @relation(fields: [id_atendimento], references: [id], onDelete: Cascade)
+
+  // FK para Usuario Destino
+  id_usuario_destino Int
+  usuario_destino    Usuario @relation("UsuarioRecebeNotificacao", fields: [id_usuario_destino], references: [id])
+
+  @@map("notificacoes")
+}
